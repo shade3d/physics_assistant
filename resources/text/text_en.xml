@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<strings>
+    <string id="title" value="Physics Assistant" />
+    <string id="msg_can_not_use_physics" value="Physics calculations are not supported in this version." />
+    <string id="msg_can_not_use_physics_grade" value="Physics calculations are not supported in this grade." />
+    <string id="msg_can_not_open_scene" value="There are no open scenes." />
+
+    <string id="group_physics_shape" value="Physics Objects" />
+    <string id="group_calc_physics" value="Physics Calculation" />
+
+    <string id="softbody" value="Soft Body" />
+    <string id="second" value="sec" />
+    <string id="unit_mm" value="mm" />
+
+    <string id="param_rigid_soft" value="Rigid/Soft Body: " />
+    <string id="param_collision" value="Collision Type: " />
+    <string id="param_margin" value="Margin: " />
+    <string id="param_softbody_volume" value="Volume" />
+    <string id="param_softbody_klst" value="Hardness: " />
+    <string id="param_softbody_kvc" value="Keep Shape: " />
+    <string id="param_all_pass_time" value="Elapsed Time: " />
+    <string id="param_pass_time" value="Step: " />
+    <string id="param_stop_trigger" value="Stop Calculation at Collision" />
+
+    <string id="button_physics_clear" value="New" />
+    <string id="button_convert_shapes" value="Bake" />
+    <string id="button_append" value="Add" />
+    <string id="button_update" value="Update" />
+    <string id="button_remove" value="Remove" />
+    <string id="button_cancel" value="Cancel" />
+    
+    <string id="msg_not_number_pass_time" value="The Step must be specified as a number." />
+    <string id="msg_not_number" value="There are items that are not specified as numeric values." />
+
+    <string id="tooltip_physics_clear" value="Clear the Physics scene data" />
+    <string id="tooltip_shapes_listbox" value="Lists physics objects added to the physics scene" />
+    <string id="tooltip_rigid_soft_static" value="A static rigid body.&#10;Not affected by collisions with other objects or by gravity." />
+    <string id="tooltip_rigid_soft_dynamic" value="A dynamic rigid body.&#10;Will deform when hit by other objects. Affected by gravity and will fall freely." />
+    <string id="tooltip_rigid_soft_softbody" value="A soft body.&#10;Cloth-like objects with no volume are also soft bodies." />
+    <string id="tooltip_collision_sphere" value="Treated as a sphere for collision detection." />
+    <string id="tooltip_collision_box" value="Treated as a box for collision detection." />
+    <string id="tooltip_collision_capsule" value="Treated as a capsule for collision detection.&#10;The longest axis is used as the height of the bounding box." />
+    <string id="tooltip_collision_mesh" value="Treated as a mesh for collision detection." />
+    <string id="tooltip_margin" value="Establishes a thickness for a physics object.&#10;If a soft body slips through other objects, add a margin." />
+    <string id="tooltip_softbody_volume" value="Turn on when specifying sphere-like polygon meshes for soft bodies.&#10;Turn off for cloth-like flat surfaces or polygon meshes with no thickness." />
+    <string id="tooltip_softbody_klst" value="The degree that adjacent vertices of a soft body stick together.&#10;Larger values result in less deformation." />
+    <string id="tooltip_softbody_kvc" value="Preserves the original shape of a soft body that has volume.&#10;Larger values result in less deformation.&#10;Values too large will result in divergence." />
+    <string id="tooltip_append_shapes" value="Adds the selected object(s) to the physics scene.&#10;The position of objects and the elapsed time of the physics scene will be reset." />
+    <string id="tooltip_update_shapes" value="Updates the information of the physics object selected in the listbox.&#10;The position of objects and the elapsed time of the physics scene will be reset." />
+    <string id="tooltip_remove_shapes" value="Removes the physics object selected in the listbox.&#10;The position of objects and the elapsed time of the physics scene will be reset." />
+    <string id="tooltip_all_pass_time" value="Displays the total elapsed time of the physics scene" />
+    <string id="tooltip_pass_time" value="Specifies the length of time to advance when stepping forward" />
+    <string id="tooltip_stop_trigger" value="Stops the physics calculation when there is a collision with a rigid body.&#10;Turn off to restart the calculation.&#10;This option does not affect soft body collisions." />
+    <string id="tooltip_time_reset" value="Resets the elapsed time of the physics scene.&#10;Physics objects will return to their original positions." />
+    <string id="tooltip_time_prev" value="Steps backward the specified length of time." />
+    <string id="tooltip_time_next" value="Steps forward the specified length of time." />
+    <string id="tooltip_conv_shapes" value="Converts the physics object to a real object.&#10;The original object is hidden." />
+    <string id="tooltip_cancel" value="Cancel the calculation" />
+</strings>

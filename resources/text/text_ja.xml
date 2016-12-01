@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<strings>
+    <string id="title" value="物理アシスタント" />
+    <string id="msg_can_not_use_physics" value="このバージョンでは物理機能を使用できません。" />
+    <string id="msg_can_not_use_physics_grade" value="このグレードでは物理機能を使用できません。" />
+    <string id="msg_can_not_open_scene" value="シーンが開かれていません。" />
+
+    <string id="group_physics_shape" value="物理形状" />
+    <string id="group_calc_physics" value="物理計算" />
+
+    <string id="softbody" value="ソフトボディ" />
+    <string id="second" value="秒" />
+    <string id="unit_mm" value="mm" />
+
+    <string id="param_rigid_soft" value="剛体/ソフトボディ : " />
+    <string id="param_collision" value="衝突形状の種類 : " />
+    <string id="param_margin" value="マージン : " />
+    <string id="param_softbody_volume" value="体積を持つ" />
+    <string id="param_softbody_klst" value="硬さ : " />
+    <string id="param_softbody_kvc" value="形を保つ : " />
+    <string id="param_all_pass_time" value="経過時間 : " />
+    <string id="param_pass_time" value="ステップ : " />
+    <string id="param_stop_trigger" value="衝突時に計算停止" />
+
+    <string id="button_physics_clear" value="新規" />
+    <string id="button_convert_shapes" value="実体化" />
+    <string id="button_append" value="追加" />
+    <string id="button_update" value="変更" />
+    <string id="button_remove" value="削除" />
+    <string id="button_cancel" value="キャンセル" />
+
+    <string id="msg_not_number_pass_time" value="ステップが数値で指定されていません。" />
+    <string id="msg_not_number" value="数値で指定されていない項目があります。" />
+
+    <string id="tooltip_physics_clear" value="物理シーンをクリアします。" />
+    <string id="tooltip_shapes_listbox" value="物理シーンに追加されている物理形状が一覧表示されます。" />
+    <string id="tooltip_rigid_soft_static" value="静的な剛体です。&#10;他の物体が衝突しても不動になります。重力の影響も受けません。" />
+    <string id="tooltip_rigid_soft_dynamic" value="動的な剛体です。&#10;他の形状がぶつかると押し出されて移動します。また、重力の影響を受けて自由落下します。" />
+    <string id="tooltip_rigid_soft_softbody" value="ソフトボディ形状です。&#10;体積のない布形状もソフトボディになります。" />
+    <string id="tooltip_collision_sphere" value="球としての衝突判定を行います。" />
+    <string id="tooltip_collision_box" value="直方体としての衝突判定を行います。" />
+    <string id="tooltip_collision_capsule" value="カプセルとしての衝突判定を行います。&#10;形状を囲ったボックス状のサイズのうち、一番長い軸が高さ方向となります。" />
+    <string id="tooltip_collision_mesh" value="メッシュとしての衝突判定を行います。" />
+    <string id="tooltip_margin" value="物理形状に厚みを設けます。&#10;ソフトボディ時にすり抜ける場合は、マージンを与えるようにしてください。" />
+    <string id="tooltip_softbody_volume" value="ソフトボディで球体のようなポリゴンメッシュを指定している場合にオンにします。&#10;布のような平面や厚みのないポリゴンメッシュの場合はオフにします。" />
+    <string id="tooltip_softbody_klst" value="ソフトボディの隣接頂点同士が結びつく強さを表します。&#10;この値が大きいと変形しにくくなります。" />
+    <string id="tooltip_softbody_kvc" value="ソフトボディが「体積を持つ」場合、元の形状の形を保つようにします。&#10;この値が大きいと変形しにくくなります。&#10;値が大きすぎると発散します。" />
+    <string id="tooltip_append_shapes" value="ブラウザで選択されている形状を物理シーンに追加します。&#10;物理シーンの経過時間と形状位置はリセットされます。" />
+    <string id="tooltip_update_shapes" value="リストボックスで選択されている物理形状情報を更新します。&#10;物理シーンの経過時間と形状位置はリセットされます。" />
+    <string id="tooltip_remove_shapes" value="リストボックスで選択されている物理形状を削除します。&#10;物理シーンの経過時間と形状位置はリセットされます。" />
+    <string id="tooltip_all_pass_time" value="物理シーン内の経過時間の合計が表示されます。" />
+    <string id="tooltip_pass_time" value="物理シーン内の時間を1ステップ進める経過時間を指定します。" />
+    <string id="tooltip_stop_trigger" value="オンにすると、剛体形状が衝突した段階で物理計算を停止させます。&#10;再開する場合はオフにしてください。&#10;ソフトボディの衝突ではこの機能は使用できません。" />
+    <string id="tooltip_time_reset" value="物理シーンの経過時間をリセットします。&#10;物理形状は初期位置に戻ります。" />
+    <string id="tooltip_time_prev" value="経過時間で指定した秒数分、時間を戻します。" />
+    <string id="tooltip_time_next" value="経過時間で指定した秒数分、時間を進めます。" />
+    <string id="tooltip_conv_shapes" value="物理計算した形状を実体化します。&#10;オリジナルの形状は非表示になります。" />
+    <string id="tooltip_cancel" value="計算を中断します。" />
+</strings>
+
