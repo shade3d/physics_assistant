@@ -1,0 +1,1367 @@
+<!-- ----------------------------------------------------- -->
+<!-- 物理アシスタント                                      -->
+<!-- ----------------------------------------------------- -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html ng-app>
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="expires" content="0" />
+<link rel="stylesheet" type="text/css" href="style.css">
+<script src="./js/angular.min.js"></script>
+<script src="./js/readExternalFile.js"></script>
+<script src="./js/loadTextResources.js"></script>
+
+<!-- -------------------------------------- -->
+<!-- JavaScript部                           -->
+<!-- -------------------------------------- -->
+
+<script type="text/javascript">
+	firstF = true;							// はじめの1回はtrue.
+	resultPartName = "Physics Result";		// 「実体化」時のパート名.
+	resultPartNameID = 0;					// 「実体化」時のパート名に付加するランダム値。「Physics Result:4877139」のように表記する.
+	timerInterval = 300;					// タイマーの間隔(ms).
+	f_stopTrigger = 0;						// 物理計算中の「衝突時に計算を停止」情報.
+
+	// ---------------------------------------------.
+	// Shade3Dでの環境設定の色が変更された場合に呼ばれる.
+	// ---------------------------------------------.
+	function color_settings_changed () {
+		if (firstF) return;
+		var element = document.getElementById("bodyElement");
+		var $scope = angular.element(element).scope();
+
+		if ($scope != null) {
+			updateWindowColor($scope, null);
+			updateButtonStyle($scope, null);	// UIとしてのボタンのスタイルを変更.
+			$scope.$apply();
+		}
+	}
+
+	// ---------------------------------------------.
+	// Shade3Dでのシーンが変更された場合に呼ばれる.
+	// ---------------------------------------------.
+	function active_scene_changed () {
+		if (firstF) return;
+		var element = document.getElementById("bodyElement");
+		var $scope = angular.element(element).scope();
+		if ($scope != null) {
+			$scope.usePhysics = canUsePhysics();	// シーンが存在しない場合はfalseが入る.
+			if ($scope.usePhysics > 0 && $scope.stdProVersion) {
+				$scope.shapeListData = [];
+				$scope.allPassTime = timeGetPassTime($scope, null);
+				unselectAllListBox($scope, null);
+				updateShapeListBox($scope, null);
+				updateCurrentPhysicsUIParam($scope, null);
+			}
+			$scope.$apply();
+		}
+	}
+
+	// ---------------------------------------------.
+	// メッセージボックスをShde3Dのxshade.show_message_boxを使用して表示.
+	// ---------------------------------------------.
+	function showMessageBox (messageStr) {
+		py_src  = "f_message='" + messageStr + "'\n";
+		py_src += readFileToString('./py/showMessageBox.py');
+		window.external.setScript(py_src);
+	}
+
+	// ---------------------------------------------.
+	// Physics機能が使用できるか.
+	// シーンが開いていない場合は0、.
+	// Physics機能が存在しない場合(Shade3Dのバージョンが古い場合)に-1を返す.	
+	// ---------------------------------------------.
+	function canUsePhysics () {
+		py_src  = readFileToString('./py/existPhysicsCheck.py');
+		resultStr = window.external.setScript(py_src);
+		if (resultStr == null) return -1;		
+		return parseInt(resultStr);
+	}
+
+	// ---------------------------------------------.
+	// Standard/Professionalの場合に物理機能が使える.
+	// ---------------------------------------------.
+	function checkStdProVersion () {
+		py_src  = readFileToString('./py/versionCheck.py');
+		resultStr = window.external.setScript(py_src);
+		if (resultStr == 'True') {
+			return true;
+		}
+		return false;
+	}
+
+	// ---------------------------------------------.
+	// Shade3Dの言語チェック。日本語の場合はtrue.
+	// ---------------------------------------------.
+	function isJapaneseMode () {
+		py_src  = readFileToString('./py/langCheck.py');
+		resultStr = window.external.setScript(py_src);
+		if (resultStr == 'ja') return true;
+		return false;
+	}
+
+	// ---------------------------------------------.
+	// 文字列リソースの読み込み.
+	// isJapanese  日本語で取得する場合はtrue.
+	// ---------------------------------------------.
+	function getStringResources ($scope, $timeout) {
+		isJapanese = $scope.isJapaneseMode;		// 日本語モードかどうか.
+		loadTextResources($scope, $timeout, isJapanese);	// XMLより文字列リストを取得.
+	}
+
+	// ---------------------------------------------.
+	//  シーンから形状が削除された場合は、物理形状を物理シーンから削除.
+	// ---------------------------------------------.
+	function updatePhysicsShapesList ($scope, $timeout, isUpdateListBox) {
+		py_src  = readFileToString('./py/getCurrentPhysics.py');
+		py_src += readFileToString('./py/updatePhysicsShapesList.py');
+		resultStr = window.external.setScript(py_src);
+		if (resultStr == null || resultStr.length == 0) return 0;
+		removeCou = parseInt(resultStr);
+		if (removeCou == 0) return 0;
+
+		unselectAllListBox($scope, $timeout);	// リストボックスの選択解除.
+
+		if (isUpdateListBox) {
+			updateShapeListBox($scope, $timeout);	// リストボックスを更新.
+		}
+
+		updateCurrentPhysicsUIParam($scope, $timeout);
+		$scope.allPassTime = timeGetPassTime($scope, $timeout);
+		$scope.$apply();
+
+		return removeCou;
+	}
+
+	// ---------------------------------------------.
+	// 物理シーン0での形状名リストを取得.
+	// ---------------------------------------------.
+	function getPhysicsShapeNameList () {
+		// 形状名リストをコンマで区切って返す.
+		py_src  = readFileToString('./py/getCurrentPhysics.py');
+		py_src += readFileToString('./py/getPhysicsShapes.py');
+		resultStr = window.external.setScript(py_src);
+		if (resultStr == null || resultStr.length == 0) return [];
+		shapeNameList = resultStr.split(',');
+		return shapeNameList;
+	}
+
+	// ---------------------------------------------.
+	// 物理形状のリストボックスを更新.
+	// ---------------------------------------------.
+	function updateShapeListBox ($scope, $timeout) {
+		if ($scope.usePhysics <= 0 || !$scope.stdProVersion) return;
+
+		//  シーンから形状が削除された場合は、物理形状を物理シーンから削除.
+		updatePhysicsShapesList($scope, $timeout, false);
+
+		// 形状名一覧を取得.
+		shapeNameList = getPhysicsShapeNameList();
+
+		// リストデータを更新.
+		$scope.shapeListData = [];
+		for (i = 0; i < shapeNameList.length; i++) {
+			$scope.shapeListData.push({key:i, value:shapeNameList[i], selected:false});
+		}
+
+		// 選択状態を保持.
+		{
+			selectIndexList = getSelectIndexShapeListBox($scope, $timeout);
+			if (selectIndexList.length == shapeNameList.length) {
+				for (i = 0; i < selectIndexList.length; i++) {
+					index = selectIndexList[i];
+					$scope.shapeListData[index].selected = true;
+				}
+			}
+		}
+
+		$scope.$apply();		// AngularJSとJavaScriptのViewのバインドを更新.
+	}
+
+	// ---------------------------------------------.
+	// 物理形状のリストボックスで選択されている形状インデックスを取得.
+	// ---------------------------------------------.
+	function getSelectIndexShapeListBox ($scope, $timeout) {
+		selectIndexList = []
+		LCou = currentForm.shapes_list.options.length;
+		for (i = 0; i < LCou; i++) {
+			opV = currentForm.shapes_list.options[i];
+			if (opV.selected) selectIndexList.push(i);
+		}
+		return selectIndexList;
+	}
+	// ---------------------------------------------.
+	// 物理形状のリストボックスで選択されている選択を解除.
+	// ---------------------------------------------.
+	function unselectAllListBox ($scope, $timeout) {
+		LCou = currentForm.shapes_list.options.length;
+		for (i = 0; i < LCou; i++) {
+			opV = currentForm.shapes_list.options[i];
+			opV.selected = false;
+		}
+	}
+	// ---------------------------------------------.
+	// 物理形状のリストボックス選択.
+	// ---------------------------------------------.
+	function selectListBox ($scope, $timeout, indexList) {
+		LCou = currentForm.shapes_list.options.length;
+		for (i = 0; i < LCou; i++) {
+			for (j = 0; j < indexList.length; j++) {
+				if (i == indexList[j]) {
+					opV = currentForm.shapes_list.options[i];
+					opV.selected = true;
+					break;
+				}
+			}
+		}
+	}
+
+	//------------------------------------------------.
+	// 剛体/ソフトボディの選択より、Physicsに格納するパラメータを取得.
+	// @return  [剛体の種類, ソフトボディ] の配列.
+	//------------------------------------------------.
+	function getRigidBodySoftBodyDataFromUI (rigidSoftBodyType) {
+		var retA = [0, 0];
+
+		switch (rigidSoftBodyType) {
+			case 0:
+				retA[0] = 1;		// rigidBody static.
+				break;
+			case 1:
+				retA[0] = 0;		// rigidBody dynamic.
+				break;
+			case 2:
+				retA[1] = 1;		// softBody.
+				break;
+		}
+		return retA;
+	}
+
+	//------------------------------------------------.
+	// 衝突形状の選択より、Physicsに格納するパラメータを取得.
+	// @return  衝突形状の種類.
+	//------------------------------------------------.
+	function getCollisionDataFromUI (collisionType) {
+		var ret = 0;
+
+		switch (collisionType) {
+			case 0:
+				ret = 1;		// Sphere.
+				break;
+			case 1:
+				ret = 2;		// Box.
+				break;
+			case 2:
+				ret = 4;		// Capsule.
+				break;
+			case 3:
+				ret = 3;		// Mesh.
+				break;
+		}
+		return ret;
+	}
+
+	//------------------------------------------------.
+	// Pythonに渡す物理形状の引数文字列を取得.
+	//------------------------------------------------.
+	function getPhysicsUIParamStr ($scope, $timeout) {
+		if ($scope.usePhysics <= 0 || !$scope.stdProVersion) return "";
+		
+		// 剛体/ソフトボディのパラメータを取得.
+		retA = getRigidBodySoftBodyDataFromUI($scope.rigidSoftBodyType);
+		f_rigidBodyType = retA[0];
+		f_softBody      = retA[1];
+
+		// 衝突形状のパラメータを取得.
+		f_collisionType = getCollisionDataFromUI($scope.collisionType);
+
+		f_margin         = $scope.margin;
+		f_softBodyVolume = $scope.softBody_volume ? '1' : '0';
+		f_softBodyKLST   = $scope.softBody_kLST;
+		f_softBodyKVC    = $scope.softBody_kVC;
+
+		// 引数のパラメータ文字列.
+		paramStr  = "";
+		paramStr += "f_rigidBodyType='" + f_rigidBodyType + "'\n";
+		paramStr += "f_softBody='" + f_softBody + "'\n";
+		paramStr += "f_collisionType='" + f_collisionType + "'\n";
+		paramStr += "f_margin='" + f_margin + "'\n";
+		paramStr += "f_softBodyVolume='" + f_softBodyVolume + "'\n";
+		paramStr += "f_softBodyKLST='" + f_softBodyKLST + "'\n";
+		paramStr += "f_softBodyKVC='" + f_softBodyKVC + "'\n";
+		return paramStr;
+	}
+
+	//------------------------------------------------.
+	// Pythonから物理形状のパラメータを取得し、UIを更新.
+	//------------------------------------------------.
+	function updateCurrentPhysicsUIParam ($scope, $timeout) {
+		if ($scope.usePhysics <= 0 || !$scope.stdProVersion) return;
+		
+		// リストボックスの選択を取得.
+		selectIndexList = getSelectIndexShapeListBox($scope, $timeout);
+		if (selectIndexList == null || selectIndexList.length == 0) return;
+
+		// リストで選択された要素のでの物理パラメータを取得.
+		//    以下のパラメータが返る.
+		//    形状番号,形状名,マージン,ソフトボディか,   <== 共通.
+		//    剛体の種類,衝突形状の種類,   <== 剛体情報.
+		//    ソフトボディの体積を持つ, ソフトボディの硬さ, ソフトボディ形を保つ  <== ソフトボディ情報.
+		sParamStr = "";
+		if (selectIndexList.length > 0) {
+			py_src = "f_index='" + selectIndexList[0] + "'\n";
+			py_src += readFileToString('./py/getCurrentPhysics.py');
+			py_src += readFileToString('./py/getPhysicsParam.py');
+			sParamStr = window.external.setScript(py_src);
+		}
+		if (sParamStr == null || sParamStr.length == 0) return;
+
+		paramList = sParamStr.split(",");
+
+		// UIを更新.
+		if (paramList.length == 9) {
+			$scope.margin = parseFloat(paramList[2]).toFixed(3);
+			if (parseInt(paramList[3]) == 1) {
+				$scope.rigidSoftBodyType = 2;
+			} else {
+				switch (parseInt(paramList[4])) {
+					case 0:		// rigidbody dynamic.
+						$scope.rigidSoftBodyType = 1;
+						break;
+					case 1:		// rigidbody static.
+						$scope.rigidSoftBodyType = 0;
+						break;
+				}
+			}
+			switch (parseInt(paramList[5])) {
+				case 1:		// Sphere.
+					$scope.collisionType = 0;
+					break;
+				case 2:		// Box.
+					$scope.collisionType = 1;
+					break;
+				case 3:		// Mesh.
+					$scope.collisionType = 3;
+					break;
+				case 4:		// Capsule.
+					$scope.collisionType = 2;
+					break;
+			}
+			$scope.softBody_volume = parseInt(paramList[6]) ? true : false;
+			$scope.softBody_kLST   = parseFloat(paramList[7]).toFixed(3);
+			$scope.softBody_kVC    = parseFloat(paramList[8]).toFixed(3);
+
+			updateButtonStyle($scope, $timeout);	// UIとしてのボタンのスタイルを変更.
+		}
+	}
+
+	//------------------------------------------------.
+	// リストボックスでの選択が変更されたときに呼ばれる.
+	//------------------------------------------------.
+	function onChangedListBox ($scope, $timeout) {
+		// 選択状態を保持.
+		selectIndexList = getSelectIndexShapeListBox($scope, $timeout);
+
+		for (i = 0; i < selectIndexList.length; i++) {
+			index = selectIndexList[i];
+			if (index >= 0 && index < $scope.shapeListData.length) {
+				$scope.shapeListData[index].selected = true;
+			}
+		}
+
+		// リストボックスの選択により、UIを更新.
+		updateCurrentPhysicsUIParam($scope, $timeout);
+	}
+
+	//------------------------------------------------.
+	// 実体化時のパート名を取得.
+	//------------------------------------------------.
+	function getResultPartName () {
+		if (resultPartNameID == 0) {
+			resultPartNameID = Math.floor(Math.random() * 99999999);
+		}
+		return resultPartName + ':' + String(resultPartNameID);
+	}
+
+	//------------------------------------------------.
+	// 物理シーンの新規作成 (クリア).
+	//------------------------------------------------.
+	function onPhysicsClear ($scope, $timeout) {
+		// パートIDを更新.
+		resultPartNameID = Math.floor(Math.random() * 99999999);
+
+		// 物理シーンをクリア.
+		py_src  = readFileToString('./py/getCurrentPhysics.py');
+		py_src += readFileToString('./py/clearPhysics.py');
+		resultStr = window.external.setScript(py_src);
+
+		// 経過時間の合計を更新.
+		$scope.allPassTime = timeGetPassTime($scope, $timeout);
+
+		// リストボックスの選択を解除.
+		unselectAllListBox($scope, $timeout);
+
+		// リストボックスを更新.
+		updateShapeListBox($scope, $timeout);
+
+		// スペースキーでボタンが押されるのを防ぐため、フォーカスを外す.
+		document.getElementById('physics_clear').blur();
+
+		// 初期化処理.
+		init($scope, $timeout);
+		$scope.$apply();
+	}
+
+	//------------------------------------------------.
+	// 形状を追加.
+	//------------------------------------------------.
+	function onAppendShapes ($scope, $timeout) {
+		if (isNaN($scope.margin)) {
+			showMessageBox($scope.ui_msg_not_number);
+			document.currentForm.margin.focus();
+			return;
+		}
+		if (isNaN($scope.softBody_kLST)) {
+			showMessageBox($scope.ui_msg_not_number);
+			document.currentForm.softBody_kLST_text.focus();
+			return;
+		}
+		if (isNaN($scope.softBody_kVC)) {
+			showMessageBox($scope.ui_msg_not_number);
+			document.currentForm.softBody_kVC_text.focus();
+			return;
+		}
+
+		// UIのパラメータを文字列で取得.
+		paramStr = getPhysicsUIParamStr($scope, $timeout);
+
+		// 物理シーンに物理形状を追加.
+		py_src  = paramStr;
+		py_src += readFileToString('./py/getCurrentPhysics.py');
+		py_src += readFileToString('./py/updateTempShapes.py');
+		py_src += readFileToString('./py/appendShapes.py');
+		strIndexList = window.external.setScript(py_src);
+
+		// リストボックスを更新.
+		updateShapeListBox($scope, $timeout);
+
+		// strIndexListは追加された形状番号のインデックス.
+		// 追加された形状を選択状態にする.
+		unselectAllListBox($scope, $timeout);
+		if (strIndexList != null) {
+			indexStrList = strIndexList.split(',');
+			selectListBox($scope, $timeout, indexStrList);
+		}
+
+		// 経過時間の合計を更新.
+		$scope.allPassTime = timeGetPassTime($scope, $timeout);
+
+		// スペースキーでボタンが押されるのを防ぐため、フォーカスを外す.
+		document.getElementById('physics_append').blur();
+	}
+
+	//------------------------------------------------.
+	// 形状を変更.
+	//------------------------------------------------.
+	function onUpdateShapes ($scope, $timeout) {
+		if (isNaN($scope.margin)) {
+			showMessageBox($scope.ui_msg_not_number);
+			document.currentForm.margin.focus();
+			return;
+		}
+		if (isNaN($scope.softBody_kLST)) {
+			showMessageBox($scope.ui_msg_not_number);
+			document.currentForm.softBody_kLST_text.focus();
+			return;
+		}
+		if (isNaN($scope.softBody_kVC)) {
+			showMessageBox($scope.ui_msg_not_number);
+			document.currentForm.softBody_kVC_text.focus();
+			return;
+		}
+		
+		// リストボックスでの選択を取得.
+		selectShapeIndexList = getSelectIndexShapeListBox($scope, $timeout);
+		selectStr = "";
+		for (i = 0; i < selectShapeIndexList.length; i++) {
+			if (i > 0) selectStr += ',';
+			selectStr += selectShapeIndexList[i];
+		}
+
+		// UIのパラメータを文字列で取得.
+		paramStr = getPhysicsUIParamStr($scope, $timeout);
+
+		py_src  = paramStr;
+		py_src += "f_selectIndex='" + selectStr + "'\n";
+		py_src += readFileToString('./py/getCurrentPhysics.py');
+		py_src += readFileToString('./py/updateTempShapes.py');
+		py_src += readFileToString('./py/updateShapes.py');
+		strIndexList = window.external.setScript(py_src);
+
+		// リストボックスを更新.
+		updateShapeListBox($scope, $timeout);
+
+		// strIndexListは追加された形状番号のインデックス.
+		// 追加された形状を選択状態にする.
+		unselectAllListBox($scope, $timeout);
+		if (strIndexList != null) {
+			indexStrList = strIndexList.split(',');
+			selectListBox($scope, $timeout, indexStrList);
+		}
+
+		// 経過時間の合計を更新.
+		$scope.allPassTime = timeGetPassTime($scope, $timeout);
+
+		// スペースキーでボタンが押されるのを防ぐため、フォーカスを外す.
+		document.getElementById('physics_update').blur();
+	}
+
+	//------------------------------------------------.
+	// 形状を削除.
+	//------------------------------------------------.
+	function onRemoveShapes ($scope, $timeout) {
+		// リストボックスでの選択を取得.
+		selectShapeIndexList = getSelectIndexShapeListBox($scope, $timeout);
+		selectStr = "";
+		for (i = 0; i < selectShapeIndexList.length; i++) {
+			if (i > 0) selectStr += ',';
+			selectStr += selectShapeIndexList[i];
+		}
+
+		// 剛体/ソフトボディのパラメータを取得.
+		retA = getRigidBodySoftBodyDataFromUI($scope.rigidSoftBodyType);
+		f_rigidBodyType = retA[0];
+		f_softBody      = retA[1];
+
+		// 衝突形状のパラメータを取得.
+		f_collisionType = getCollisionDataFromUI($scope.collisionType);
+
+		py_src  = "f_selectIndex='" + selectStr + "'\n";
+		py_src += readFileToString('./py/getCurrentPhysics.py');
+		py_src += readFileToString('./py/removeShapes.py');
+		resultStr = window.external.setScript(py_src);
+
+		// リストボックスの選択を解除.
+		unselectAllListBox($scope, $timeout);
+
+		// リストボックスを更新.
+		updateShapeListBox($scope, $timeout);
+
+		// 経過時間の合計を更新.
+		$scope.allPassTime = timeGetPassTime($scope, $timeout);
+
+		// スペースキーでボタンが押されるのを防ぐため、フォーカスを外す.
+		document.getElementById('physics_remove').blur();
+	}
+
+	//------------------------------------------------.
+	// 物理経過時間を取得.
+	//------------------------------------------------.
+	function timeGetPassTime ($scope, $timeout) {
+		if ($scope.usePhysics <= 0 || !$scope.stdProVersion) return 0.0;
+		
+		py_src  = readFileToString('./py/getCurrentPhysics.py');
+		py_src += readFileToString('./py/timeGetPassTime.py');
+		passTimeStr = window.external.setScript(py_src);
+		if (passTimeStr == null) return 0.0;
+		return parseFloat(passTimeStr);
+	}
+
+	//------------------------------------------------.
+	// 物理時間をリセットする.
+	//------------------------------------------------.
+	function timeResetStep ($scope, $timeout) {
+		// 計算中の場合はスキップ.
+		if ($scope.showCalcProgressBar == true) return;
+
+		py_src  = readFileToString('./py/getCurrentPhysics.py');
+		py_src += readFileToString('./py/timeResetStep.py');
+		window.external.setScript(py_src);
+
+		// 経過時間の合計を更新.
+		$scope.allPassTime = timeGetPassTime($scope, $timeout);
+	}
+
+	//------------------------------------------------.
+	// 物理時間を経過させる.
+	// ここでは物理時間の計算開始トリガーだけ指定し、計算はsetIntervalのタイマー内で行う.
+	//------------------------------------------------.
+	function timeStep ($scope, $timeout, stepTime) {
+		// 計算中の場合はスキップ.
+		if ($scope.showCalcProgressBar == true) return;
+
+		if (isNaN(stepTime)) {
+			showMessageBox($scope.ui_msg_not_number_pass_time);
+			document.currentForm.passTime.focus();
+			return;
+		}
+
+		f_stopTrigger = $scope.stopTrigger ? 1 : 0;
+
+		// 時間を戻す場合は、いったんリセットしてから「経過時間 + stepTime」分進める.
+		f_stepTime = stepTime;
+		if (stepTime < 0.0) {
+			$scope.allPassTime = timeGetPassTime($scope, $timeout);
+			f_stepTime = $scope.allPassTime + stepTime;
+			timeResetStep($scope, $timeout);	// 時間をリセット.
+			if (f_stepTime < 0.0) f_stepTime = 0.0;
+			f_stopTrigger = 0;
+		}
+		if (f_stepTime <= 0.0) {	// 時間を戻した場合に経過時間が0.0となった際に実体化が必要.
+			doConvertShapes($scope, $timeout);		// 実体化.
+			return;
+		}
+
+		// 時間を進める.
+		// ループで回してプログレスバーで時間経過がわかるようにする.
+		$scope.timeStepPos = 0;
+		$scope.timeStepList = getTimeStepList($scope, $timeout, f_stepTime);
+		if ($scope.timeStepList == null || $scope.timeStepList.length == 0) return;
+
+		$scope.calcProgressValue = 0;
+		$scope.showCalcProgressBar = true;
+
+		// 200ms分は先に計算 (ここで計算が完了する場合は、タイマーでは計算せず).
+		var stTime = new Date();
+		for (i = 0; i < 1000; i++) {
+			doOneStep($scope, $timeout, f_stopTrigger);
+			if ($scope.showCalcProgressBar == false) break;
+			var curTime = new Date();
+			if ((curTime - stTime) > 200) break;
+		}
+
+		$scope.$apply();
+	}
+
+	//------------------------------------------------.
+	// 物理計算中にキャンセルボタンが押された場合.
+	//------------------------------------------------.
+	function cancelCalc ($scope, $timeout) {
+		if ($scope.showCalcProgressBar == false) return;
+		$scope.showCalcProgressBar = false;
+		$scope.timeStepList = null;
+		$scope.timeStepPos  = 0;
+
+		// 経過時間の合計を更新.
+		$scope.allPassTime = timeGetPassTime($scope, $timeout);
+		$scope.$apply();
+
+		// 実体化.
+		doConvertShapes($scope, $timeout);
+
+		// スペースキーでボタンが押されるのを防ぐため、フォーカスを外す.
+		document.getElementById('calc_cancel').blur();
+	}
+
+	//------------------------------------------------------------.
+	// 1回分の物理計算を行う (setIntervalのタイマーから呼ばれる).
+	//------------------------------------------------------------.
+	function doOneStep ($scope, $timeout, stopTrigger) {
+		if ($scope.showCalcProgressBar == false || $scope.timeStepList == null) return;
+
+		// 計算終了時にプログレスバーは非表示にして、形状を実体化.
+		if ($scope.timeStepPos >= $scope.timeStepList.length) {
+			cancelCalc($scope, $timeout);
+			return;
+		}
+
+		// 物理時間を進める.	
+		// $scope.timeStepList[$scope.timeStepPos] の時間分進める.
+		py_src  = "f_stopTrigger='" + stopTrigger + "'\n";
+		py_src += "f_stepTime='" + $scope.timeStepList[$scope.timeStepPos] + "'\n";
+		py_src += "f_mode='stepForce'\n";
+		py_src += readFileToString('./py/getCurrentPhysics.py');
+		py_src += readFileToString('./py/timeStep.py');
+		resultStr = window.external.setScript(py_src);
+
+		// 衝突があった場合は計算を打ち切る.
+		if (resultStr != null && resultStr == '1') {
+			cancelCalc($scope, $timeout);
+			return;
+		}
+
+		// プログレスバーの更新.
+		progressDV = 100.0;
+		if ($scope.timeStepList.length > 1) {
+			progressDV /= parseFloat($scope.timeStepList.length - 1);
+		}
+		progressV = progressDV * ($scope.timeStepPos);
+		$scope.calcProgressValue = parseInt(progressV);
+
+		$scope.timeStepPos += 1;
+
+		// 経過時間の合計を更新.
+		$scope.allPassTime = timeGetPassTime($scope, $timeout);
+	}
+
+	//------------------------------------------------.
+	// 経過時間を細分化したときのリストを取得.
+	//------------------------------------------------.
+	function getTimeStepList ($scope, $timeout, stepTime) {
+		if (isNaN(stepTime)) {
+			return [];
+		}
+
+		f_stopTrigger = $scope.stopTrigger ? 1 : 0;
+
+		// 時間を戻す場合は、いったんリセットしてから「経過時間 + stepTime」分進める.
+		f_stepTime = stepTime;
+		if (stepTime < 0.0) {
+			$scope.allPassTime = timeGetPassTime($scope, $timeout);
+			f_stepTime = $scope.allPassTime + stepTime;
+			if (f_stepTime < 0.0) f_stepTime = 0.0;
+			f_stopTrigger = 0;
+		}
+		if (f_stepTime <= 0.0) return [];
+
+		py_src  = "f_stopTrigger='" + f_stopTrigger + "'\n";
+		py_src += "f_stepTime='" + f_stepTime + "'\n";
+		py_src += "f_mode='getDivideList'\n";	// 細分化したときのリストを取得.
+		py_src += readFileToString('./py/getCurrentPhysics.py');
+		py_src += readFileToString('./py/timeStep.py');
+		resultStr = window.external.setScript(py_src);
+		if (resultStr == null || resultStr.length == 0) return [];
+
+		aList = resultStr.split(',');
+		return aList;
+	}
+
+	//------------------------------------------------.
+	// 物理形状を実体化.
+	//------------------------------------------------.
+	function doConvertShapes ($scope, $timeout) {
+		py_src  = readFileToString('./py/getCurrentPhysics.py');
+		py_src += "f_partName='" + getResultPartName() + "'\n";
+		py_src += readFileToString('./py/convertShapes.py');
+		window.external.setScript(py_src);
+
+		// スペースキーでボタンが押されるのを防ぐため、フォーカスを外す.
+		document.getElementById('calc_physics_conv_shapes').blur();
+	}
+
+	//------------------------------------------------.
+	// Preferenceよりウィンドウ色などを取得し、UIに反映.
+	//------------------------------------------------.
+	function updateWindowColor ($scope, $timeout) {
+		$scope.color_background    = {'background-color': '#4f4f4f'};	// ウィンドウの背景色.
+		$scope.color_text          = {'color': '#ffffff'};				// テキスト色.
+		$scope.color_group         = {'border-color': '#000000', 'color': '#4ffffff'};		// グループ枠.
+		$scope.color_select_button = {'background-color': '#eafb00', 'color': '#4ffffff'};	// ボタンが選択されたときの色.
+		$scope.color_normal_button = {'background-color': '#4f4f4f', 'color': '#4ffffff'};	// 非選択のボタンの色.
+		$scope.color_hover_button  = {'background-color': '#8c8c8c', 'color': '#4ffffff'};	// マウスオーバー時のボタンの色.
+
+		py_src = readFileToString('./py/preferenceColor.py');
+		colorStrList = window.external.setScript(py_src);
+		if (colorStrList == null) return;
+
+		colorsList = colorStrList.split(',');
+		if (colorsList.length == 4) {
+			$scope.color_background    = {'background-color': colorsList[0]};
+			$scope.color_text          = {'color': colorsList[1]};
+			$scope.color_group         = {'border-color': colorsList[3], 'color': colorsList[1]};
+			$scope.color_select_button = {'background-color': colorsList[2], 'color': colorsList[1]};
+			$scope.color_normal_button = {'background-color': colorsList[0], 'color': colorsList[1]};
+		}
+
+		// ボタンのスタイル配列を初期化.
+		initButtonStyle($scope, $timeout);
+	}
+
+	//------------------------------------------------.
+	// ボタンスタイル（マウスオーバーや選択状態など）の初期化.
+	// ボタン色については、Shade3DではPreferenceで動的に変えることができるため、.
+	// cssだけでは対応できないので、動的に処理する.
+	//------------------------------------------------.
+	function initButtonStyle ($scope, $timeout) {
+		$scope.buttonStyleData = [];
+		$scope.buttonStyleData['rigidSoft_0'] = $scope.color_normal_button;
+		$scope.buttonStyleData['rigidSoft_1'] = $scope.color_normal_button;
+		$scope.buttonStyleData['rigidSoft_2'] = $scope.color_normal_button;
+		$scope.buttonStyleData['collision_0'] = $scope.color_normal_button;
+		$scope.buttonStyleData['collision_1'] = $scope.color_normal_button;
+		$scope.buttonStyleData['collision_2'] = $scope.color_normal_button;
+		$scope.buttonStyleData['collision_3'] = $scope.color_normal_button;
+		$scope.buttonStyleData['append'] = $scope.color_normal_button;
+		$scope.buttonStyleData['update'] = $scope.color_normal_button;
+		$scope.buttonStyleData['remove'] = $scope.color_normal_button;
+		$scope.buttonStyleData['time_reset'] = $scope.color_normal_button;
+		$scope.buttonStyleData['time_prev'] = $scope.color_normal_button;
+		$scope.buttonStyleData['time_next'] = $scope.color_normal_button;
+		$scope.buttonStyleData['conv_shapes'] = $scope.color_normal_button;
+		$scope.buttonStyleData['clear'] = $scope.color_normal_button;
+		$scope.buttonStyleData['cancel'] = $scope.color_normal_button;
+	}
+
+	//------------------------------------------------.
+	// 選択状態より、ボタンのStyle情報を更新.
+	//------------------------------------------------.
+	function updateButtonStyle ($scope, $timeout) {
+		$scope.buttonStyleData['rigidSoft_0'] = $scope.color_normal_button;
+		$scope.buttonStyleData['rigidSoft_1'] = $scope.color_normal_button;
+		$scope.buttonStyleData['rigidSoft_2'] = $scope.color_normal_button;
+		$scope.buttonStyleData['collision_0'] = $scope.color_normal_button;
+		$scope.buttonStyleData['collision_1'] = $scope.color_normal_button;
+		$scope.buttonStyleData['collision_2'] = $scope.color_normal_button;
+		$scope.buttonStyleData['collision_3'] = $scope.color_normal_button;
+
+		{
+			keyName = "collision_" + $scope.collisionType;
+			$scope.buttonStyleData[keyName] = $scope.color_select_button;
+		}
+		{
+			keyName = "rigidSoft_" + $scope.rigidSoftBodyType;
+			$scope.buttonStyleData[keyName] = $scope.color_select_button;
+		}
+	}
+
+	//------------------------------------------------.
+	// ボタンのマウスオーバー時.
+	// key           ボタン識別のキー名.
+	// existSelect   すでに選択がある場合.
+	//------------------------------------------------.
+	function enterButton ($scope, $timeout, key, existSelect) {
+		v = $scope.buttonStyleData[key];
+		if (v == null) return;
+		if (existSelect) {
+			$scope.buttonStyleData[key] = $scope.color_select_button;
+		} else {
+			$scope.buttonStyleData[key] = $scope.color_hover_button;
+		}
+	}
+
+	//------------------------------------------------.
+	// ボタンのマウスオーバーから去った時.
+	// key           ボタン識別のキー名.
+	// existSelect   すでに選択がある場合.
+	//------------------------------------------------.
+	function leaveButton ($scope, $timeout, key, existSelect) {
+		v = $scope.buttonStyleData[key];
+		if (v == null) return;
+		if (existSelect) {
+			$scope.buttonStyleData[key] = $scope.color_select_button;
+		} else {
+			$scope.buttonStyleData[key] = $scope.color_normal_button;
+		}
+	}
+
+	//------------------------------------------------.
+	// 計算中のプログレスバーの表示/非表示.
+	//------------------------------------------------.
+	function showCalcProgressBar ($scope, $timeout, showF) {
+		$scope.showCalcProgressBar = showF;			// 計算中のプログレスバーの表示/非表示.
+	}
+
+	//------------------------------------------------.
+	// 計算中のプログレスバーの進行を指定 (0-100).
+	//------------------------------------------------.
+	function setCalcProgressBarValue ($scope, $timeout, v) {
+		$scope.calcProgressValue = v;
+	}
+
+	//------------------------------------------------.
+	// 画像のドラッグ＆ドロップを禁止する.
+	//------------------------------------------------.
+	function disableImagesDragAndDrop () {
+		var elements = document.getElementsByClassName("button");
+		for (i = 0; i < elements.length; i++) {
+			disableDragAndDrop(elements[i]);
+		}
+	}
+
+	//------------------------------------------------.
+	// 画像のドラッグ＆ドロップを禁止する.
+	//------------------------------------------------.
+	function disableDragAndDrop (element) {
+		element.draggable = false;
+		element.onmousedown = function(event) {
+			event.preventDefault();
+			return false;
+		};
+	}
+
+	//------------------------------------------------.
+	// 初期値の格納.
+	//------------------------------------------------.
+	function init ($scope, $timeout) {
+		// はじめの1回だけ呼ばれる.
+		if (firstF) {
+			$scope.usePhysics     = canUsePhysics();		// Physics機能が使えるか.
+			$scope.stdProVersion  = checkStdProVersion();	// StandardかProfessional版の場合.
+			$scope.isJapaneseMode = isJapaneseMode();		// 日本語モードかどうか.
+			$scope.shapeListData = [];						// リストボックスに表示する形状名リスト.
+
+			// 文字列リソースを取得.
+			getStringResources($scope, $timeout);
+
+			// リストボックスを更新.
+			if ($scope.usePhysics >= 1 && $scope.stdProVersion) {
+				updateShapeListBox($scope, $timeout);
+			}
+
+			// 画像のドラッグ＆ドロップを禁止する.
+			disableImagesDragAndDrop();
+		}
+
+		$scope.allPassTime       = 0.0;				// 経過時間の合計.
+		$scope.collisionType     = 1;				// 衝突形状の種類 (球/ボックス/カプセル/メッシュ).
+		$scope.rigidSoftBodyType = 1;				// 剛体/ソフトボディの種類 (剛体静的/剛体動的/ソフトボディ).
+		$scope.margin            = 0.0;				// マージン.
+		$scope.softBody_volume   = false;			// ソフトボディ - 体積を保つ.
+		$scope.softBody_kLST     = 0.1;				// ソフトボディ - 硬さ.
+		$scope.softBody_kVC      = 0.0;				// ソフトボディ - 形を保つ.
+		$scope.passTime          = 0.2;				// 経過時間.
+		$scope.stopTrigger       = false;			// 衝突時の計算停止.
+		$scope.showCalcProgressBar = false;			// 計算中のプログレスバーの表示/非表示.
+		$scope.calcProgressValue = 50;				// 計算中のプログレスバーの位置.
+		$scope.timeStepList      = null;			// 計算中の時間リスト(floatのリスト).
+		$scope.timeStepPos       = 0;				// $scope.timeStepList 上のカレント位置.
+
+		// 背景色やボタン色などを反映、ボタン用のStyleテーブルを作成.
+		updateWindowColor($scope, $timeout);
+		updateButtonStyle($scope, $timeout);	// UIとしてのボタンのスタイルを変更.
+
+		firstF = false;
+	}
+
+	//------------------------------------------------.
+	// AngularJSとして、何かイベントがあれば呼ばれる.
+	//------------------------------------------------.
+	function physicsAssistant ($scope, $timeout) {
+		// 初期化処理.
+		init($scope, $timeout);
+		
+		$scope.allPassTime = timeGetPassTime($scope, $timeout);		// 経過時間の合計.
+
+		// リストボックスでの選択変更.
+		$scope.onChangedListBox = function() {
+			onChangedListBox($scope, $timeout);
+		}
+
+		// 衝突形状の種類を選択.
+		$scope.onCollisionType = function(type) {
+			if ($scope.rigidSoftBodyType == 2) return;
+			$scope.collisionType = type;
+			updateButtonStyle($scope, $timeout);	// UIとしてのボタンのスタイルを変更.
+		}
+
+		// 剛体/ソフトボディの種類を選択.
+		$scope.onRigidSoftBodyType = function(type) {
+			$scope.rigidSoftBodyType = type;
+			updateButtonStyle($scope, $timeout);	// UIとしてのボタンのスタイルを変更.
+		}
+
+		// 形状変更ボタンのEnableチェック（リストボックスで選択があるかで判断）.
+		$scope.chkSelectListBox = function() {
+			// リストボックスの選択を取得.
+			selectIndexList = getSelectIndexShapeListBox($scope, $timeout);
+			if (selectIndexList == null || selectIndexList.length == 0) return false;
+			return true;
+		}
+
+		// 物理シーンの新規（クリア）.
+		$scope.onPhysicsClear = function() {
+			// 計算中の場合はスキップ.
+			if ($scope.showCalcProgressBar == true) return;
+
+			onPhysicsClear($scope, $timeout);
+		}
+
+		// 形状追加.
+		$scope.onAppendShapes = function() {
+			// 計算中の場合はスキップ.
+			if ($scope.showCalcProgressBar == true) return;
+
+			onAppendShapes($scope, $timeout);
+		}
+
+		// 形状変更.
+		$scope.onUpdateShapes = function() {
+			// 計算中の場合はスキップ.
+			if ($scope.showCalcProgressBar == true) return;
+
+			onUpdateShapes($scope, $timeout);
+		}
+
+		// 形状削除.
+		$scope.onRemoveShapes = function() {
+			// 計算中の場合はスキップ.
+			if ($scope.showCalcProgressBar == true) return;
+
+			onRemoveShapes($scope, $timeout);
+		}
+
+		// 時間をリセット.
+		$scope.onResetStep = function() {
+			//  シーンから形状が削除された場合は、物理形状を物理シーンから削除.
+			updatePhysicsShapesList($scope, $timeout, true);
+
+			// 計算中の場合はスキップ.
+			if ($scope.showCalcProgressBar == true) return;
+			
+			timeResetStep($scope, $timeout);
+			doConvertShapes($scope, $timeout);	// 実体化.
+		}
+
+		// 時間を戻す.
+		$scope.onPrevStep = function() {
+			//  シーンから形状が削除された場合は、物理形状を物理シーンから削除.
+			updatePhysicsShapesList($scope, $timeout, true);
+
+			// 計算中の場合はスキップ.
+			if ($scope.showCalcProgressBar == true) return;
+
+			timeStep($scope, $timeout, -($scope.passTime));
+		}
+
+		// 時間を進める.
+		$scope.onNextStep = function() {
+			//  シーンから形状が削除された場合は、物理形状を物理シーンから削除.
+			updatePhysicsShapesList($scope, $timeout, true);
+
+			// 計算中の場合はスキップ.
+			if ($scope.showCalcProgressBar == true) return;
+
+			timeStep($scope, $timeout, $scope.passTime);
+		}
+
+		// 衝突形状の種類での画像ボタンのclassを取得.
+		$scope.getCollisionButtonClass = function(cIndex) {
+			if ($scope.rigidSoftBodyType == 2) return "button_disabled";
+			if ($scope.collisionType == cIndex) return "button_select";
+			return "button";
+		}
+
+		// ボタンにマウスカーソルが入ったとき.
+		$scope.enterButton = function(key, existSelect) {
+			enterButton($scope, $timeout, key, existSelect);
+		}
+
+		// ボタンからマウスカーソルが出たとき.
+		$scope.leaveButton = function(key, existSelect) {
+			leaveButton($scope, $timeout, key, existSelect);
+		}
+
+		// 計算をキャンセルした場合.
+		$scope.cancelCalc= function() {
+			cancelCalc($scope, $timeout);
+		}
+
+		// タイマーで計算中のプログレスバーを更新.
+		setInterval(function () {
+			// プログレスバーを表示しない場合はスキップ.
+			if ($scope.showCalcProgressBar == false || $scope.timeStepList == null) return;
+
+			// 200ms分の物理計算を行う.
+			var stTime = new Date();
+			for (i = 0; i < 1000; i++) {
+				doOneStep($scope, $timeout, f_stopTrigger);
+				if ($scope.showCalcProgressBar == false) break;
+				var curTime = new Date();
+				if ((curTime - stTime) > 200) break;
+			}
+			$scope.$apply();
+		}, timerInterval);
+	}
+</script>
+
+</head>
+
+<!-- -------------------------------------- -->
+<!-- HTML部                                 -->
+<!-- -------------------------------------- -->
+<body ng-controller="physicsAssistant" ng-style="color_background" id="bodyElement">
+	<div>
+		<!-- 物理機能が使用できない場合(シーンが開かれていない場合) -->
+		<div ng-show="usePhysics < 0 && stdProVersion == true" ng-style="color_text">
+			<div class="group" ng-style="color_text">
+				{{ui_msg_can_not_use_physics}}
+			</div>
+		</div>
+
+		<!-- BASIC版の場合 -->
+		<div ng-show="stdProVersion == false" ng-style="color_text">
+			<div class="group" ng-style="color_text">
+				{{ui_msg_can_not_use_physics_grade}}
+			</div>
+		</div>
+
+		<!-- シーンが開かれていない場合 -->
+		<div ng-show="usePhysics == 0 && stdProVersion == true" ng-style="color_text">
+			<div class="group" ng-style="color_text">
+				{{ui_msg_can_not_open_scene}}
+			</div>
+		</div>
+
+		<!-- 物理機能が使用できる場合 -->
+		<div ng-show="usePhysics > 0 && stdProVersion == true">
+			<form method="POST" name="currentForm">	
+				<div class="group" ng-style="color_text">
+					<input type="button" name="physics_clear" id="physics_clear" value="{{ui_button_physics_clear}}" class="button" style="width:60px;"
+						ng-style="buttonStyleData['clear']"
+						ng-mouseenter="enterButton('clear', false)"
+						ng-mouseleave="leaveButton('clear', false)"
+						ng-click="onPhysicsClear()"
+						title="{{ui_tooltip_physics_clear}}" /><br>
+				</div>
+			
+				<div class="group_caption">
+					{{ui_group_physics_shape}}
+				</div>
+				<div class="group" ng-style="color_text">
+					<table border="0">
+						<tr>
+							<td valign="top">
+								<select name="shapes_list" multiple ng-model="shapeListBox" ng-options="c.value for c in shapeListData track by c.key" ng-click="onChangedListBox()" ng-change="onChangedListBox()" size="14" style="width:200px;" class="default"
+									title="{{ui_tooltip_shapes_listbox}}" >
+								</select>
+							</td>
+							<td valign="top">
+								<table border="0">
+									<tr>
+										<td nowrap style="width:120px;" align="right">{{ui_param_rigid_soft}}</td>
+										<td class="button">
+											<div class="button">
+												<img src="resources/images/type_rigidbody_static.png"
+													ng-class="(rigidSoftBodyType == 0) ? 'button_select' : 'button'"
+													ng-style="buttonStyleData['rigidSoft_0']"
+													ng-mouseenter="enterButton('rigidSoft_0', rigidSoftBodyType == 0)"
+													ng-mouseleave="leaveButton('rigidSoft_0', rigidSoftBodyType == 0)"
+													ng-click="onRigidSoftBodyType(0)"
+													title="{{ui_tooltip_rigid_soft_static}}" />
+											</div>
+										</td>
+										<td class="button">
+											<div class="button">
+												<img src="resources/images/type_rigidbody_dynamic.png"
+													ng-class="(rigidSoftBodyType == 1) ? 'button_select' : 'button'"
+													ng-style="buttonStyleData['rigidSoft_1']"
+													ng-mouseenter="enterButton('rigidSoft_1', rigidSoftBodyType == 1)"
+													ng-mouseleave="leaveButton('rigidSoft_1', rigidSoftBodyType == 1)"
+													ng-click="onRigidSoftBodyType(1)"
+													title="{{ui_tooltip_rigid_soft_dynamic}}" />
+											</div>
+										</td>
+										<td class="button">
+											<div class="button">
+												<img src="resources/images/type_softbody.png"
+													ng-class="(rigidSoftBodyType == 2) ? 'button_select' : 'button'"
+													ng-style="buttonStyleData['rigidSoft_2']"
+													ng-mouseenter="enterButton('rigidSoft_2', rigidSoftBodyType == 2)"
+													ng-mouseleave="leaveButton('rigidSoft_2', rigidSoftBodyType == 2)"
+													ng-click="onRigidSoftBodyType(2)"
+													title="{{ui_tooltip_rigid_soft_softbody}}" />
+											</div>
+										</td>
+									</tr>
+								</table>
+								<table border="0">
+									<tr>
+										<td nowrap style="width:120px;" align="right">{{ui_param_collision}}</td>
+										<td class="button">
+											<div class="button">
+												<img src="resources/images/rigidbody_sphere.png"
+													ng-class="getCollisionButtonClass(0)"
+													ng-disabled="rigidSoftBodyType == 2"
+													ng-style="buttonStyleData['collision_0']"
+													ng-mouseenter="enterButton('collision_0', collisionType == 0 && rigidSoftBodyType != 2)"
+													ng-mouseleave="leaveButton('collision_0', collisionType == 0 && rigidSoftBodyType != 2)"
+													ng-click="onCollisionType(0)"
+													title="{{ui_tooltip_collision_sphere}}" />
+											</div>
+										</td>
+										<td class="button">
+											<div class="button">
+												<img src="resources/images/rigidbody_box.png"
+													ng-class="getCollisionButtonClass(1)"
+													ng-disabled="rigidSoftBodyType == 2"
+													ng-style="buttonStyleData['collision_1']"
+													ng-mouseenter="enterButton('collision_1', collisionType == 1 && rigidSoftBodyType != 2)"
+													ng-mouseleave="leaveButton('collision_1', collisionType == 1 && rigidSoftBodyType != 2)"
+													ng-click="onCollisionType(1)"
+													title="{{ui_tooltip_collision_box}}" />
+											</div>
+										</td>
+										<td class="button">
+											<div class="button">
+												<img src="resources/images/rigidbody_capsule.png"
+													ng-class="getCollisionButtonClass(2)"
+													ng-disabled="rigidSoftBodyType == 2"
+													ng-style="buttonStyleData['collision_2']"
+													ng-mouseenter="enterButton('collision_2', collisionType == 2 && rigidSoftBodyType != 2)"
+													ng-mouseleave="leaveButton('collision_2', collisionType == 2 && rigidSoftBodyType != 2)"
+													ng-click="onCollisionType(2)"
+													title="{{ui_tooltip_collision_capsule}}" />
+											</div>
+										</td>
+										<td class="button">
+											<div class="button">
+												<img src="resources/images/rigidbody_mesh.png"
+													ng-class="getCollisionButtonClass(3)"
+													ng-disabled="rigidSoftBodyType == 2"
+													ng-style="buttonStyleData['collision_3']"
+													ng-mouseenter="enterButton('collision_3', collisionType == 3 && rigidSoftBodyType != 2)"
+													ng-mouseleave="leaveButton('collision_3', collisionType == 3 && rigidSoftBodyType != 2)"
+													ng-click="onCollisionType(3)"
+													title="{{ui_tooltip_collision_mesh}}" />
+											</div>
+										</td>
+									</tr>
+								</table>
+								<table border="0">
+									<tr>
+										<td nowrap style="width:120px;" align="right">{{ui_param_margin}}</td>
+										<td>
+											<input type="text" name="margin" class="input_widget" ng-model="margin"
+												title="{{ui_tooltip_margin}}" />{{ui_unit_mm}}
+										</td>
+									</tr>
+								</table>
+								<fieldset ng-class="(rigidSoftBodyType == 2) ? 'inner_group' : 'inner_group_disabled'">
+									<legend class="inner_group" ng-style="color_group">{{ui_softbody}}</legend>
+									<table border="0">
+										<tr>
+											<td colspan="2" valign="center">
+												<label for="softBody_Volume_checkbox" title="{{ui_tooltip_softbody_volume}}">						
+													<input type="checkbox" id="softBody_Volume_checkbox" class="checkbox_default" ng-model="softBody_volume" ng-disabled="rigidSoftBodyType != 2" />&nbsp;{{ui_param_softbody_volume}}
+												</label>
+											</td>
+										</tr>
+										<tr style="height:20px;">
+											<td align="right" valign="center" nowrap>
+												{{ui_param_softbody_klst}}
+											</td>
+											<td valign="center" nowrap>
+												<input type="text" name="softbody_kLST_text" ng-model="softBody_kLST" value="0.0" style="width:50px;" class="input_widget_normal" ng-disabled="rigidSoftBodyType != 2"
+													title="{{ui_tooltip_softbody_klst}}" />
+												<input type="range" name="softbody_kLST" ng-model="softBody_kLST" value="0.0" min="0.0" max="1.0" step="0.1" class="slider" ng-disabled="rigidSoftBodyType != 2"
+													title="{{ui_tooltip_softbody_klst}}" />
+											</td>
+										</tr>
+										<tr>
+											<td align="right" valign="center" nowrap>
+												{{ui_param_softbody_kvc}}
+											</td>
+											<td valign="center" nowrap>
+												<input type="text" name="softbody_kVC_text" ng-model="softBody_kVC" value="0.0" style="width:50px;" class="input_widget_normal" ng-disabled="rigidSoftBodyType != 2"
+													title="{{ui_tooltip_softbody_kvc}}" />
+												<input type="range" name="softbody_kVC" ng-model="softBody_kVC" value="0.0" min="0.0" max="50.0" step="0.1" class="slider" ng-disabled="rigidSoftBodyType != 2"
+													title="{{ui_tooltip_softbody_kvc}}" />
+											</td>
+										</tr>
+									</table>
+								</fieldset> 
+							</td>
+						</tr>
+					</table>
+					<input type="button" name="physics_append" id="physics_append" value=" {{ui_button_append}} " style="width: 100%;" class="button"
+						ng-style="buttonStyleData['append']"
+						ng-mouseenter="enterButton('append', false)"
+						ng-mouseleave="leaveButton('append', false)"
+						ng-click="onAppendShapes()"
+						title="{{ui_tooltip_append_shapes}}" /><br>
+					<input type="button" name="physics_update" id="physics_update" value=" {{ui_button_update}} " style="width: 100%;" class="button"
+						ng-style="buttonStyleData['update']"
+						ng-mouseenter="enterButton('update', false)"
+						ng-mouseleave="leaveButton('update', false)"
+						ng-click="onUpdateShapes()"
+						title="{{ui_tooltip_update_shapes}}" /><br>
+					<input type="button" name="physics_remove" id="physics_remove" value=" {{ui_button_remove}} " style="width: 100%;" class="button"
+						ng-style="buttonStyleData['remove']"
+						ng-mouseenter="enterButton('remove', false)"
+						ng-mouseleave="leaveButton('remove', false)"
+						ng-click="onRemoveShapes()"
+						title="{{ui_tooltip_remove_shapes}}" /><br>
+				</div>
+
+				<div class="group_caption">
+					{{ui_group_calc_physics}}
+				</div>
+				<div class="group" ng-style="color_text">
+					<table border="0">
+						<tr>
+							<td>
+								<table border="0">
+									<tr>
+										<td nowrap align="left">{{ui_param_all_pass_time}}</td>
+										<td title="{{ui_tooltip_all_pass_time}}" align="right" style="width:80px;">{{allPassTime | number : 4}} {{ui_second}}</td>
+										<td style="width:30px;">&nbsp;</td>
+										<td nowrap style="width:100px;" align="right">{{ui_param_pass_time}}</td>
+										<td>
+											<input type="text" name="passTime" ng-model="passTime" class="input_widget"
+												title="{{ui_tooltip_pass_time}}" />{{ui_second}}
+										</td>
+									</tr>
+									<tr>
+										<td colspan="3" valign="center" nowrap>
+											<label for="stopTrigger_checkbox" title="{{ui_tooltip_stop_trigger}}">
+												<input type="checkbox" id="stopTrigger_checkbox" class="checkbox_default" ng-model="stopTrigger" />&nbsp;{{ui_param_stop_trigger}}
+											</label>
+										</td>
+										<td colspan="2" valign="center" nowrap>
+											<table border="0">
+												<tr>
+													<td style="width:50px;"></td>
+													<td class="button" valign="center">
+														<div class="button">
+															<img src="resources/images/timeline_reset.png" class="button"
+																ng-style="buttonStyleData['time_reset']"
+																ng-mouseenter="enterButton('time_reset', false)"
+																ng-mouseleave="leaveButton('time_reset', false)"
+																ng-click="onResetStep()"
+																title="{{ui_tooltip_time_reset}}" />
+														</div>
+													</td>
+													<td class="button" valign="center">
+														<div class="button">
+															<img src="resources/images/timeline_prev.png" class="button"
+																ng-style="buttonStyleData['time_prev']"
+																ng-mouseenter="enterButton('time_prev', false)"
+																ng-mouseleave="leaveButton('time_prev', false)"
+																ng-click="onPrevStep()"
+																title="{{ui_tooltip_time_prev}}" />
+														</div>
+													</td>
+													<td class="button" valign="center">
+														<div class="button">
+															<img src="resources/images/timeline_next.png" class="button"
+																ng-style="buttonStyleData['time_next']"
+																ng-mouseenter="enterButton('time_next', false)"
+																ng-mouseleave="leaveButton('time_next', false)"
+																ng-click="onNextStep()"
+																title="{{ui_tooltip_time_next}}" />
+														</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+									</tr>
+								</table>
+							</td>
+						</tr>
+					</table>
+				</div>
+			</form>
+		</div>
+		<hr />
+
+		<!-- ステータスバーに、計算中のプログレスバーを表示 -->
+		<div class="group_statusBar" ng-style="color_text">
+			<label ng-show="showCalcProgressBar == true && usePhysics > 0 && stdProVersion == true">
+				<progress ng-value="calcProgressValue" max="100"><span>{{calcProgressValue}}</span>%</progress> {{calcProgressValue}}% 
+				&nbsp;
+				<input type="button" name="calc_cancel" id="calc_cancel" value="{{ui_button_cancel}}" class="button" style="width:90px;"
+					ng-style="buttonStyleData['cancel']"
+					ng-mouseenter="enterButton('cancel', false)"
+					ng-mouseleave="leaveButton('cancel', false)"
+					ng-click="cancelCalc()"
+					title="{{ui_tooltip_cancel}}" />
+			</label>
+		</div>
+	</div>
+</body>
+</html>

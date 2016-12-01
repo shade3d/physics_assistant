@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<widget>
+	<uuid>B0DA8AFE-6F7F-4511-AE26-92FC6BC5A31D</uuid>
+	<name lang="ja">物理アシスタント</name>
+	<name lang="en">Physics Assistant</name>
+	<url>index.html</url>
+	<version>1.0.1</version>
+	<description lang="ja">物理アシスタント</description>
+	<description lang="en">Physics Assistant</description>
+	<window initial_size="520 559"
+		position="0.42 0.63"
+		resizeable="true">
+	</window>
+</widget>

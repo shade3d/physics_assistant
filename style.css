@@ -1,0 +1,168 @@
+body {
+  color: #ffffff;
+  background-color: #707070;
+  font-size: small;
+  font-family:Lucida Grande,Arial,'MS UI Gothic',sans-serif;
+  user-select:none;
+  -ms-user-select:none;
+  -webkit-user-select: none;
+  padding: 0px 0px 0px 0px;
+  margin: 0px 0px 0px 0px;
+}
+
+/*
+ グループ枠 ----------------.
+ */
+div.group {
+  border: 0px;
+  margin: 4px 4px 4px 4px;
+  padding: 4px 4px 4px 4px;
+}
+div.group_statusBar {
+  border: 0px;
+  margin: 1px 4px 1px 4px;
+  padding: 1px 4px 1px 4px;
+}
+
+div.group_caption {
+  text-align: center;
+  background-color: #4f4f4f;
+  color: #ffffff;
+  /*border: 1px solid #000000; */
+  margin: 1px 0px 1px 0px;
+  padding: 2px 0px 2px 0px;
+}
+
+/*
+ リストボックス ----------------.
+ */
+select.default {
+  border: 1px solid #303030;
+}
+
+/*
+ ボタン用 ----------------.
+ */
+div.button {
+  border: 0px;
+  margin: 0px 0px 0px 0px;
+  padding: 0px 0px 0px 0px;
+}
+
+div.button:hover {
+  border: 0px;
+  margin: 0px 0px 0px 0px;
+  padding: 0px 0px 0px 0px;
+}
+
+/*
+ テーブルのボタン枠 ----------------.
+ */
+td.button {
+  border: 0px;
+  margin: 0px 0px 0px 0px;
+  padding: 4px 1px 0px 1px;
+}
+
+/*
+ 画像のボタン枠 ----------------.
+ */
+img.button {
+  border: 1px solid #000000;
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+img.button_select {
+  /* background-color: #eafb00; */
+  border: 1px solid #000000;
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+img.button:hover {
+  background-color: #8c8c8c;
+  border: 1px solid #000000;
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+img.button_disabled {
+  border: 1px solid #000000;
+  opacity: 0.3;
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+/*
+ 数値入力領域  ------------------------.
+ */
+input.input_widget {
+  width: 50px;
+  margin: 4px 12px 4px 0px;
+  ime-mode: disabled;
+  text-align: right;
+}
+input.input_widget_normal {
+  ime-mode: disabled;
+  text-align: right;
+}
+
+/*
+ チェックボックス  ------------------------.
+ */
+input.checkbox_default {
+  margin: 4px 4px 4px 4px;
+}
+
+/*
+ ソフトボディのグループ枠 ----------------.
+ */
+fieldset.inner_group {
+  border: 1px solid #000000;
+  margin: 2px 2px 2px 2px;
+  padding: 4px 4px 4px 4px;
+}
+fieldset.inner_group_disabled {
+  opacity: 0.3;
+  border: 1px solid #000000;
+  margin: 2px 2px 2px 2px;
+  padding: 4px 4px 4px 4px;
+}
+
+/*
+ ソフトボディのグループ枠のタイトル部 ----------------.
+ */
+legend.inner_group {
+  padding: 2px 8px 2px 8px;
+}
+
+/*
+ スライダ ----------------.
+ */
+input.slider {
+  width: 110px;
+  margin: 1px 1px 1px 1px;
+  padding: 0px 0px 0px 0px;
+}
+
+/*
+ プッシュボタン ----------------.
+ */
+input.button {
+  /* color: #ffffff; */
+  border: 1px solid #000000;
+  background-color: #707070;
+  margin: 1px 1px 1px 1px;
+  padding: 1px 1px 1px 1px;
+}
+input.button:hover {
+  /* color: #ffffff; */
+  border: 1px solid #000000;
+  background-color: #808080;
+  margin: 1px 1px 1px 1px;
+  padding: 1px 1px 1px 1px;
+}
+input.button_disabled {
+  border: 1px solid #000000;
+  opacity: 0.3;
+  margin: 1px 1px 1px 1px;
+  padding: 1px 1px 1px 1px;
+}
